@@ -26,14 +26,28 @@
 
 #ifndef DATATYPES_USING_DEFINED
 #define DATATYPES_USING_DEFINED
-using DATATYPE_IN1 = std::uint8_t;
-using DATATYPE_OUT = std::uint8_t;
+using DATATYPE_IN1 = char;
+using DATATYPE_IN2 = char;
+using DATATYPE_OUT = std::uint16_t;
 #endif
 
-// Initialize input buffer with sequential values
+constexpr int SEQ_LEN = 16;
+constexpr int DP_ROWS = SEQ_LEN + 1; // 17
+constexpr int DP_COLS = SEQ_LEN + 1; // 17
+// Pad to next multiple of 4 elements for 4-byte DMA alignment (289 -> 292)
+constexpr int OUT_ELEMS = ((DP_ROWS * DP_COLS + 3) / 4) * 4; // 292
+
+// Initialize input buffer with 16 characters of sequence data
 void initialize_bufIn1(DATATYPE_IN1 *bufIn1, int SIZE) {
+  const char *seq = "TGAAATTTTGTTGCAG";
   for (int i = 0; i < SIZE; i++)
-    bufIn1[i] = static_cast<DATATYPE_IN1>(i);
+    bufIn1[i] = seq[i];
+}
+
+void initialize_bufIn2(DATATYPE_IN2 *bufIn2, int SIZE) {
+  const char *seq = "TGACTTTGCTATGCAG";
+  for (int i = 0; i < SIZE; i++)
+    bufIn2[i] = seq[i];
 }
 
 // Zero output buffer
@@ -41,16 +55,53 @@ void initialize_bufOut(DATATYPE_OUT *bufOut, int SIZE) {
   memset(bufOut, 0, SIZE * sizeof(DATATYPE_OUT));
 }
 
-// Passthrough verify: output must equal input byte-for-byte
-int verify_passthrough(DATATYPE_IN1 *bufIn1, DATATYPE_OUT *bufOut,
-                       int SIZE, int verbosity) {
+// Verify alignment DP matrix: first row and column must be zero (boundary condition)
+int verify_alignment(DATATYPE_IN1 *r_seq, DATATYPE_IN2 *q_seq,
+                     DATATYPE_OUT *bufOut, int SIZE, int verbosity) {
   int errors = 0;
-  for (int i = 0; i < SIZE; i++) {
-    if (bufOut[i] != bufIn1[i]) {
+  // Check boundary row (row 0)
+  for (int col = 0; col < DP_COLS; col++) {
+    if (bufOut[col] != 0) {
       if (verbosity >= 1)
-        std::cout << "Error at [" << i << "]: got " << (int)bufOut[i]
-                  << " expected " << (int)bufIn1[i] << "\n";
+        std::cout << "Boundary error at [0][" << col << "]: got "
+                  << bufOut[col] << " expected 0\n";
       errors++;
+    }
+  }
+  // Check boundary column (col 0 of each row)
+  for (int row = 0; row < DP_ROWS; row++) {
+    if (bufOut[row * DP_COLS] != 0) {
+      if (verbosity >= 1)
+        std::cout << "Boundary error at [" << row << "][0]: got "
+                  << bufOut[row * DP_COLS] << " expected 0\n";
+      errors++;
+    }
+  }
+  if(errors == 0) {
+    printf("Showing DP scores (16x16): \n");
+
+    const size_t RLEN = 16;
+    const size_t QLEN = 16;
+
+    DATATYPE_OUT (*DP)[RLEN+1] = reinterpret_cast<DATATYPE_OUT(*)[RLEN+1]>(bufOut);
+
+    printf("        ");
+    for(int i = 0; i<=RLEN; i++){
+      printf("   %c", r_seq[i]);
+    }
+    printf("\n");
+    printf("   +—————————————————————————————————————————————————————————————————————\n");
+
+    for(int j = 0; j<=QLEN; j++){
+      if(j != 0)
+        printf(" %c |", q_seq[j-1]); // we are doing one more than needed
+      else
+        printf("   |");
+
+    for(int i = 0; i<=RLEN; i++) {
+        printf(" %3d", bufOut[i*(QLEN+1)+j]);
+      }
+      printf("\n");
     }
   }
   return errors;
@@ -62,12 +113,14 @@ int verify_passthrough(DATATYPE_IN1 *bufIn1, DATATYPE_OUT *bufOut,
 
 int main(int argc, const char *argv[]) {
 
-  constexpr int IN1_VOLUME = IN1_SIZE / sizeof(DATATYPE_IN1);
-  constexpr int OUT_VOLUME = OUT_SIZE / sizeof(DATATYPE_OUT);
+  constexpr int IN1_VOLUME = SEQ_LEN / sizeof(DATATYPE_IN1);
+  constexpr int IN2_VOLUME = SEQ_LEN / sizeof(DATATYPE_IN2);
+  constexpr int OUT_VOLUME = OUT_ELEMS; // 292 (289 valid + 3 padding for DMA alignment)
 
   args myargs = parse_args(argc, argv);
 
-  return setup_and_run_aie<DATATYPE_IN1, DATATYPE_OUT,
-                           initialize_bufIn1, initialize_bufOut,
-                           verify_passthrough>(IN1_VOLUME, OUT_VOLUME, myargs);
+  return setup_and_run_aie<DATATYPE_IN1, DATATYPE_IN2, DATATYPE_OUT,
+                           initialize_bufIn1, initialize_bufIn2,
+                           initialize_bufOut, verify_alignment>(
+      IN1_VOLUME, IN2_VOLUME, OUT_VOLUME, myargs);
 }
