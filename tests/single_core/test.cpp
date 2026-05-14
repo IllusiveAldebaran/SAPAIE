@@ -26,8 +26,8 @@
 
 #ifndef DATATYPES_USING_DEFINED
 #define DATATYPES_USING_DEFINED
-using DATATYPE_IN1 = char;
-using DATATYPE_IN2 = char;
+using DATATYPE_IN1 = uint8_t; // really just char
+using DATATYPE_IN2 = uint8_t;
 using DATATYPE_OUT = std::uint16_t;
 #endif
 
@@ -39,13 +39,13 @@ constexpr int OUT_ELEMS = ((DP_ROWS * DP_COLS + 3) / 4) * 4; // 292
 
 // Initialize input buffer with 16 characters of sequence data
 void initialize_bufIn1(DATATYPE_IN1 *bufIn1, int SIZE) {
-  const char *seq = "TGAAATTTTGTTGCAG";
+  const uint8_t *seq = (const uint8_t*)("TGAAATTTTGTTGCAG");
   for (int i = 0; i < SIZE; i++)
     bufIn1[i] = seq[i];
 }
 
 void initialize_bufIn2(DATATYPE_IN2 *bufIn2, int SIZE) {
-  const char *seq = "TGACTTTGCTATGCAG";
+  const uint8_t *seq = (const uint8_t*)("TGACTTTGCTATGCAG");
   for (int i = 0; i < SIZE; i++)
     bufIn2[i] = seq[i];
 }
@@ -56,53 +56,55 @@ void initialize_bufOut(DATATYPE_OUT *bufOut, int SIZE) {
 }
 
 // Verify alignment DP matrix: first row and column must be zero (boundary condition)
-int verify_alignment(DATATYPE_IN1 *r_seq, DATATYPE_IN2 *q_seq,
-                     DATATYPE_OUT *bufOut, int SIZE, int verbosity) {
+int verify_alignment(DATATYPE_IN1 *refSeq, DATATYPE_IN2 *qrySeq,
+                     DATATYPE_OUT *DP, int SIZE, int verbosity) {
   int errors = 0;
   // Check boundary row (row 0)
   for (int col = 0; col < DP_COLS; col++) {
-    if (bufOut[col] != 0) {
+    if (DP[col] != 0) {
       if (verbosity >= 1)
         std::cout << "Boundary error at [0][" << col << "]: got "
-                  << bufOut[col] << " expected 0\n";
+                  << DP[col] << " expected 0\n";
       errors++;
     }
   }
   // Check boundary column (col 0 of each row)
   for (int row = 0; row < DP_ROWS; row++) {
-    if (bufOut[row * DP_COLS] != 0) {
+    if (DP[row * DP_COLS] != 0) {
       if (verbosity >= 1)
         std::cout << "Boundary error at [" << row << "][0]: got "
-                  << bufOut[row * DP_COLS] << " expected 0\n";
+                  << DP[row * DP_COLS] << " expected 0\n";
       errors++;
     }
   }
   if(errors == 0) {
-    printf("Showing DP scores (16x16): \n");
-
     const size_t RLEN = 16;
     const size_t QLEN = 16;
+    const size_t DP_COLS = RLEN+1;
+    const size_t DP_ROWS = QLEN+1;
 
-    DATATYPE_OUT (*DP)[RLEN+1] = reinterpret_cast<DATATYPE_OUT(*)[RLEN+1]>(bufOut);
+    printf("Realigning on DP for comparison\n");
+    uint16_t* DPCPU = (uint16_t*)malloc((DP_COLS)*(DP_ROWS)*sizeof(uint16_t));
+  
+    // calculate DP matrix and return it
+    fillDPSmithWaterman(refSeq, RLEN, qrySeq, QLEN, DPCPU);
 
-    printf("        ");
-    for(int i = 0; i<=RLEN; i++){
-      printf("   %c", r_seq[i]);
+    printf("Verifying Final DP Matrix...\n");
+    for (size_t j = 0; j <= static_cast<int>(QLEN); j++)
+      for (size_t i = 0; i <= static_cast<int>(RLEN); i++)
+        if(DPCPU[j * DP_COLS + i] != DP[j*DP_COLS + i])
+	  errors++;
+
+
+    if(errors != 0) {
+      printf("Errors! %d errors accumulated over mismatched DP scores\n", errors);
+      showDP(refSeq, RLEN, qrySeq, QLEN, DP);
+      printf("CPU aligned DP\n");
+      showDP(refSeq, RLEN, qrySeq, QLEN, DPCPU);
     }
-    printf("\n");
-    printf("   +—————————————————————————————————————————————————————————————————————\n");
 
-    for(int j = 0; j<=QLEN; j++){
-      if(j != 0)
-        printf(" %c |", q_seq[j-1]); // we are doing one more than needed
-      else
-        printf("   |");
+    free(DPCPU);
 
-    for(int i = 0; i<=RLEN; i++) {
-        printf(" %3d", bufOut[i*(QLEN+1)+j]);
-      }
-      printf("\n");
-    }
   }
   return errors;
 }
