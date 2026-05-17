@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "xrt_test_wrapper.h"
-#include "../../seq_utils.h"
+#include "../../utils/xrt_align_wrapper.h"
+#include "../../utils/seq_utils.h"
 #include <cstdint>
 #include <cstring>
 
@@ -26,41 +26,54 @@
 
 #ifndef DATATYPES_USING_DEFINED
 #define DATATYPES_USING_DEFINED
-using DATATYPE_IN1 = uint8_t; // really just char
-using DATATYPE_IN2 = uint8_t;
-using DATATYPE_OUT = std::uint16_t;
+using DATATYPE_IN  = uint8_t;
+using DATATYPE_OUT = uint16_t;
 #endif
 
-constexpr int SEQ_LEN = 16;
-constexpr int DP_ROWS = SEQ_LEN + 1; // 17
-constexpr int DP_COLS = SEQ_LEN + 1; // 17
-// Pad to next multiple of 4 elements for 4-byte DMA alignment (289 -> 292)
-constexpr int OUT_ELEMS = ((DP_ROWS * DP_COLS + 3) / 4) * 4; // 292
+struct AlignmentTest {
+  const char *name;
+  const char *ref;
+  const char *query;
+  int ref_len;
+  int query_len;
+};
 
-// Initialize input buffer with 16 characters of sequence data
-void initialize_bufIn1(DATATYPE_IN1 *bufIn1, int SIZE) {
-  const uint8_t *seq = (const uint8_t*)("TGAAATTTTGTTGCAG");
-  for (int i = 0; i < SIZE; i++)
-    bufIn1[i] = seq[i];
+#define ATEST(name, ref, query) { name, ref, query, (int)__builtin_strlen(ref), (int)__builtin_strlen(query) }
+
+static const AlignmentTest tests[] = {
+  ATEST("basic_16x16", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAG"),
+  ATEST("exact_16x16", "ACCAACACTGGATTGC", "ACCAACACTGGATTGC"),
+  ATEST("oppst_16x16", "AAAATTTTAAAATTTT", "CCCCGGGGCCCCGGGG"),
+  ATEST("ATCG_16x16" , "AAAATTTTCCCCGGGG", "GGAAAATTTTCCCCGG"),
+  //ATEST("ATCG_32x32" , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
+};
+
+static const AlignmentTest *g_test = nullptr;
+
+void initialize_ref(DATATYPE_IN *seq, int seqLen) {
+  for (int i = 0; i < seqLen; i++)
+    seq[i] = (uint8_t)g_test->ref[i];
 }
 
-void initialize_bufIn2(DATATYPE_IN2 *bufIn2, int SIZE) {
-  const uint8_t *seq = (const uint8_t*)("TGACTTTGCTATGCAG");
-  for (int i = 0; i < SIZE; i++)
-    bufIn2[i] = seq[i];
+void initialize_qry(DATATYPE_IN *seq, int seqLen) {
+  for (int i = 0; i < seqLen; i++)
+    seq[i] = (uint8_t)g_test->query[i];
 }
 
 // Zero output buffer
-void initialize_bufOut(DATATYPE_OUT *bufOut, int SIZE) {
+void initialize_DP(DATATYPE_OUT *bufOut, int SIZE) {
   memset(bufOut, 0, SIZE * sizeof(DATATYPE_OUT));
 }
 
 // Verify alignment DP matrix: first row and column must be zero (boundary condition)
-int verify_alignment(DATATYPE_IN1 *refSeq, DATATYPE_IN2 *qrySeq,
+int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, uint32_t qryLen,
                      DATATYPE_OUT *DP, int SIZE, int verbosity) {
+  const size_t dp_cols = refLen + 1;
+  const size_t dp_rows = qryLen + 1;
+
   int errors = 0;
   // Check boundary row (row 0)
-  for (int col = 0; col < DP_COLS; col++) {
+  for (size_t col = 0; col < dp_cols; col++) {
     if (DP[col] != 0) {
       if (verbosity >= 1)
         std::cout << "Boundary error at [0][" << col << "]: got "
@@ -69,60 +82,73 @@ int verify_alignment(DATATYPE_IN1 *refSeq, DATATYPE_IN2 *qrySeq,
     }
   }
   // Check boundary column (col 0 of each row)
-  for (int row = 0; row < DP_ROWS; row++) {
-    if (DP[row * DP_COLS] != 0) {
+  for (size_t row = 0; row < dp_rows; row++) {
+    if (DP[row * dp_cols] != 0) {
       if (verbosity >= 1)
         std::cout << "Boundary error at [" << row << "][0]: got "
-                  << DP[row * DP_COLS] << " expected 0\n";
+                  << DP[row * dp_cols] << " expected 0\n";
       errors++;
     }
   }
-  if(errors == 0) {
-    const size_t RLEN = 16;
-    const size_t QLEN = 16;
-    const size_t DP_COLS = RLEN+1;
-    const size_t DP_ROWS = QLEN+1;
+  if (errors == 0) {
+    if(verbosity >= 1)
+      printf("Realigning on CPU for comparison\n");
+    DATATYPE_OUT *DPCPU = (DATATYPE_OUT *)malloc(dp_cols * dp_rows * sizeof(DATATYPE_OUT));
 
-    printf("Realigning on DP for comparison\n");
-    uint16_t* DPCPU = (uint16_t*)malloc((DP_COLS)*(DP_ROWS)*sizeof(uint16_t));
-  
-    // calculate DP matrix and return it
-    fillDPSmithWaterman(refSeq, RLEN, qrySeq, QLEN, DPCPU);
+    // Test on CPU
+    fillDPSmithWaterman(refSeq, refLen, qrySeq, qryLen, DPCPU);
 
-    printf("Verifying Final DP Matrix...\n");
-    for (size_t j = 0; j <= static_cast<int>(QLEN); j++)
-      for (size_t i = 0; i <= static_cast<int>(RLEN); i++)
-        if(DPCPU[j * DP_COLS + i] != DP[j*DP_COLS + i])
-	  errors++;
+    if(verbosity >= 1)
+      printf("Verifying Final DP Matrix...\n");
+    for (size_t j = 0; j < dp_rows; j++)
+      for (size_t i = 0; i < dp_cols; i++)
+        if (DPCPU[j * dp_cols + i] != DP[j * dp_cols + i])
+          errors++;
 
-
-    if(errors != 0) {
-      printf("Errors! %d errors accumulated over mismatched DP scores\n", errors);
-      showDP(refSeq, RLEN, qrySeq, QLEN, DP);
+    if (errors != 0) {
       printf("CPU aligned DP\n");
-      showDP(refSeq, RLEN, qrySeq, QLEN, DPCPU);
+      showDP(refSeq, refLen, qrySeq, qryLen, DPCPU);
     }
 
     free(DPCPU);
-
   }
+
+  if (errors != 0) {
+    printf("Errors! %d errors accumulated over mismatched DP scores\n", errors);
+    showDP(refSeq, refLen, qrySeq, qryLen, DP);
+  }
+
   return errors;
 }
+
+int runTest(const AlignmentTest &t, args myargs) {
+  g_test = &t;
+  const int dp_rows = t.query_len + 1;
+  const int dp_cols = t.ref_len + 1;
+  const int out_elems = ((dp_rows * dp_cols + 3) / 4) * 4;
+
+  uint32_t REF_VOLUME = t.ref_len;
+  uint32_t QRY_VOLUME = t.query_len;
+  uint32_t OUT_VOLUME = out_elems;
+
+  std::cout << "=== Test: " << t.name << " ===\n";
+  return setup_and_align_aie<DATATYPE_IN, DATATYPE_OUT,
+                           initialize_ref, initialize_qry,
+                           initialize_DP, verify_alignment>(
+      REF_VOLUME, QRY_VOLUME, OUT_VOLUME, myargs);
+}
+
 
 //*****************************************************************************
 // Should not need to modify below section
 //*****************************************************************************
 
 int main(int argc, const char *argv[]) {
-
-  constexpr int IN1_VOLUME = SEQ_LEN / sizeof(DATATYPE_IN1);
-  constexpr int IN2_VOLUME = SEQ_LEN / sizeof(DATATYPE_IN2);
-  constexpr int OUT_VOLUME = OUT_ELEMS; // 292 (289 valid + 3 padding for DMA alignment)
-
   args myargs = parse_args(argc, argv);
 
-  return setup_and_run_aie<DATATYPE_IN1, DATATYPE_IN2, DATATYPE_OUT,
-                           initialize_bufIn1, initialize_bufIn2,
-                           initialize_bufOut, verify_alignment>(
-      IN1_VOLUME, IN2_VOLUME, OUT_VOLUME, myargs);
+  int return_code = 0;
+  for (const auto &t : tests)
+    return_code |= runTest(t, myargs);
+
+  return return_code;
 }

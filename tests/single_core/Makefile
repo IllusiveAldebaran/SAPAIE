@@ -39,6 +39,9 @@ in2_size = 16  # 16 chars (bytes)
 out_size = 584 # 292 uint16_t * 2 bytes (289 valid + 3 pad for 4-byte DMA alignment)
 trace_size = 8192
 CHESS ?= false
+CHESS ?= false
+
+verbose ?= 0 # acceptable values 1 and 2 (more verbose)
 
 aie_py_src=${targetname}_placed.py
 
@@ -91,7 +94,7 @@ else
 endif
 
 run: ${targetname}.exe build/final.xclbin build/insts.bin
-	${powershell} ./$< -x build/final.xclbin -i build/insts.bin -k MLIR_AIE
+	${powershell} ./$< -x build/final.xclbin -i build/insts.bin -k MLIR_AIE --verbosity ${verbose}
 
 run_py: build/final.xclbin build/insts.bin
 	${powershell} python3 ${srcdir}/test.py -x build/final.xclbin -i build/insts.bin -k MLIR_AIE
