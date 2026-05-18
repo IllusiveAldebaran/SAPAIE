@@ -13,7 +13,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// custom wrapper for alignment
 #include "../../utils/xrt_align_wrapper.h"
+// Set of tests for seq_utils
 #include "../../utils/seq_utils.h"
 #include <cstdint>
 #include <cstring>
@@ -30,40 +32,7 @@ using DATATYPE_IN  = uint8_t;
 using DATATYPE_OUT = uint16_t;
 #endif
 
-struct AlignmentTest {
-  const char *name;
-  const char *ref; // note ref and query are parsed as uint8_t almost immediately
-  const char *query;
-  uint32_t ref_len;
-  uint32_t query_len;
-  const char *build_dir; // path to build/<r>x<q>/ containing final.xclbin and insts.bin
-};
-
-#define ATEST(name, ref, query, build_dir) \
-  { name, ref, query, (int)__builtin_strlen(ref), (int)__builtin_strlen(query), build_dir }
-
-// --- 32x32 tests ---
-static const AlignmentTest tests32x32[] = {
-  ATEST("ATCG_32x32", "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT", "build/32x32"),
-};
-
-// --- 32x64 tests ---
-static const AlignmentTest tests32x64[] = {
-  ATEST("ATCG_32x64",
-        "TTTTCACTTAAAGTATTATGCACGACAGGGTG",
-        "CGTGTACCATGTAAACCTGTTATAACTTACCTCGTGTACCATGTAAACCTGTTATAACTTACCT",
-        "build/32x64"),
-};
-
-// Flat list of all tests across all sizes — add new arrays here
-static const AlignmentTest *all_test_groups[] = {
-  tests32x32,
-  tests32x64,
-};
-static const size_t all_test_group_sizes[] = {
-  sizeof(tests32x32) / sizeof(tests32x32[0]),
-  sizeof(tests32x64) / sizeof(tests32x64[0]),
-};
+#include "../seq_input_tests.h"
 
 static const AlignmentTest *g_test = nullptr;
 static std::string g_base_dir; // directory of the executable, for resolving build paths

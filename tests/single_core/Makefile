@@ -42,11 +42,11 @@ verbose ?= 0 # acceptable values 1 and 2 (more verbose)
 aie_py_src=${targetname}_placed.py
 
 # Space-separated list of ref_len:qry_len size pairs to build xclbins for.
-# Add new sizes here and add matching test arrays in test.cpp.
-SIZES ?= 32:32 32:64
+# Builds for tests suite. Specify which type if you want to only do specific ones.
+TEST_SIZES ?= 16:16 32:32 32:64 128:128 #159:161
 
 # Derive all per-size xclbin paths
-xclbin_targets := $(foreach sz,$(SIZES),build/$(subst :,x,$(sz))/final.xclbin)
+xclbin_targets := $(foreach sz,$(TEST_SIZES),build/$(subst :,x,$(sz))/final.xclbin)
 
 .PHONY: all template clean
 
@@ -81,7 +81,7 @@ build/$(subst :,x,$(1))/final.xclbin: build/$(subst :,x,$(1))/aie2_lineBased_8b.
 		$(CURDIR)/build/$(subst :,x,$(1))/aie2_lineBased_8b.mlir
 endef
 
-$(foreach sz,$(SIZES),$(eval $(call build_size_targets,$(sz))))
+$(foreach sz,$(TEST_SIZES),$(eval $(call build_size_targets,$(sz))))
 
 # --- Host binary (built once, size-agnostic at compile time) ---
 ${targetname}.exe: ${srcdir}/test.cpp
