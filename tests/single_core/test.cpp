@@ -119,8 +119,8 @@ int runTest(const AlignmentTest &t, args myargs) {
   uint32_t OUT_VOLUME = out_elems;
 
   // Point to the size-specific build artifacts
-  myargs.xclbin = g_base_dir + t.build_dir + "/final.xclbin";
-  myargs.instr  = g_base_dir + t.build_dir + "/insts.bin";
+  myargs.xclbin = g_base_dir + atest_build_dir(t) + "/final.xclbin";
+  myargs.instr  = g_base_dir + atest_build_dir(t) + "/insts.bin";
 
   std::cout << "=== Test: " << t.name << " ===\n";
   return setup_and_align_aie<DATATYPE_IN, DATATYPE_OUT,
