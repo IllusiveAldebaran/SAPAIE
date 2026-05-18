@@ -43,7 +43,7 @@ def my_align_kernel(dev, trace_size, ref_len, qry_len):
 
         # Tile declarations
         ShimTile    = tile(0, 0)
-        ComputeTile2 = tile(0, 2, allocation_scheme="basic-sequential")
+        ComputeTile2 = tile(0, 2)
 
         # Set up a packet-switched flow from core to shim for tracing information
         tiles_to_trace = [ComputeTile2, ShimTile]
@@ -58,7 +58,7 @@ def my_align_kernel(dev, trace_size, ref_len, qry_len):
         # double buffering would be great for multiple alignment kernels
         of_in1 = object_fifo("in1", ShimTile, ComputeTile2, 2, in1_ty)
         of_in2 = object_fifo("in2", ShimTile, ComputeTile2, 2, in2_ty)
-        of_out = object_fifo("out", ComputeTile2, ShimTile,  1, out_ty)
+        of_out = object_fifo("out", ComputeTile2, ShimTile,  2, out_ty)
 
         # Compute tile 2
         @core(ComputeTile2)

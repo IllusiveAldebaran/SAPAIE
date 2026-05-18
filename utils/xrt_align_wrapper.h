@@ -32,15 +32,7 @@ struct args parse_args(int argc, const char *argv[]) {
 
   struct args myargs;
 
-  // parse_options unconditionally checks for xclbin/instr on the command line,
-  // but this test suite sets them per-test inside runTest — skip that check.
-  try {
-    vm = options.parse(argc, argv);
-    if (vm.count("help")) { std::cout << options.help() << "\n"; std::exit(1); }
-  } catch (const cxxopts::exceptions::parsing &e) {
-    std::cerr << e.what() << "\n\n" << "Usage:\n" << options.help() << "\n";
-    std::exit(1);
-  }
+  test_utils::parse_options(argc, argv, options, vm);
   myargs.verbosity = vm["verbosity"].as<int>();
   myargs.do_verify = vm["verify"].as<bool>();
   myargs.n_iterations = vm["iters"].as<int>();
