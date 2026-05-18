@@ -34,61 +34,60 @@ PEANOWRAP2P_FLAGS += -DALIGN_SCALAR
 
 devicename ?= $(if $(filter 1,$(NPU2)),npu2,npu)
 targetname = align_npu
-ref_len   ?= 16
-qry_len   ?= 16
-in1_size   = $(ref_len)
-in2_size   = $(qry_len)
-# out_size: (qry_len+1)*(ref_len+1) rounded up to even uint16, times 2 bytes
-out_size   = $(shell python3 -c "r=$(ref_len);q=$(qry_len);n=(q+1)*(r+1);print(((n+1)//2)*2*2)")
 trace_size = 8192
-CHESS ?= false
 CHESS ?= false
 
 verbose ?= 0 # acceptable values 1 and 2 (more verbose)
 
 aie_py_src=${targetname}_placed.py
 
+# Space-separated list of ref_len:qry_len size pairs to build xclbins for.
+# Add new sizes here and add matching test arrays in test.cpp.
+SIZES ?= 32:32 32:64
+
+# Derive all per-size xclbin paths
+xclbin_targets := $(foreach sz,$(SIZES),build/$(subst :,x,$(sz))/final.xclbin)
+
 .PHONY: all template clean
 
-all: build/final.xclbin
+all: $(xclbin_targets) ${targetname}.exe
 
-# build npu kernels
-build/%.cc.o: %.cc
+# --- Per-size kernel object (shared across all sizes since the AIE kernel is size-agnostic) ---
+build/align_u16.cc.o: align_u16.cc
 	mkdir -p ${@D}
 ifeq ($(devicename),npu)
 	cd ${@D} && ${PEANO_INSTALL_DIR}/bin/clang++ ${PEANOWRAP2_FLAGS} -DBIT_WIDTH=8 -c $< -o ${@F}
 else ifeq ($(devicename),npu2)
 	cd ${@D} && ${PEANO_INSTALL_DIR}/bin/clang++ ${PEANOWRAP2P_FLAGS} -DBIT_WIDTH=8 -c $< -o ${@F}
 else
-	echo "Device type not supported"
+	$(error Device type not supported)
 endif
 
-build/aie2_lineBased_8b.mlir: ${srcdir}/${aie_py_src}
-	mkdir -p ${@D}
-	python3 $< -d ${devicename} --ref-len ${ref_len} --qry-len ${qry_len} > $@
+# --- Per-size MLIR generation and xclbin compilation ---
+# $(1) = "ref_len:qry_len", e.g. "32:32"
+define build_size_targets
+build/$(subst :,x,$(1))/aie2_lineBased_8b.mlir: ${srcdir}/${aie_py_src}
+	mkdir -p $$(@D)
+	python3 $$< -d ${devicename} \
+		--ref-len $(word 1,$(subst :, ,$(1))) \
+		--qry-len $(word 2,$(subst :, ,$(1))) > $$@
 
-build/aie2_trace_lineBased_8b.mlir: ${srcdir}/${aie_py_src}
-	mkdir -p ${@D}
-	python3 $< -d ${devicename} -t ${trace_size} --ref-len ${ref_len} --qry-len ${qry_len} > $@
-
-build/final.xclbin: build/aie2_lineBased_8b.mlir build/align_u16.cc.o
-	mkdir -p ${@D}
-	cd ${@D} && aiecc --aie-generate-xclbin --aie-generate-npu-insts  \
+build/$(subst :,x,$(1))/final.xclbin: build/$(subst :,x,$(1))/aie2_lineBased_8b.mlir build/align_u16.cc.o
+	mkdir -p $$(@D)
+	cp build/align_u16.cc.o $$(@D)/
+	cd $$(@D) && aiecc --aie-generate-xclbin --aie-generate-npu-insts \
 		--no-xchesscc --no-xbridge \
-		--xclbin-name=${@F} --npu-insts-name=insts.bin $(<:%=../%)
+		--xclbin-name=final.xclbin --npu-insts-name=insts.bin \
+		$(CURDIR)/build/$(subst :,x,$(1))/aie2_lineBased_8b.mlir
+endef
 
-build/final_trace.xclbin: build/aie2_trace_lineBased_8b.mlir build/align_u16.cc.o
-	mkdir -p ${@D}
-	cd ${@D} && aiecc --aie-generate-xclbin --aie-generate-npu-insts  \
-		--no-xchesscc --no-xbridge \
-		--xclbin-name=${@F} --npu-insts-name=insts.bin $(<:%=../%)
+$(foreach sz,$(SIZES),$(eval $(call build_size_targets,$(sz))))
 
-
+# --- Host binary (built once, size-agnostic at compile time) ---
 ${targetname}.exe: ${srcdir}/test.cpp
 	rm -rf _build
 	mkdir -p _build
-	cd _build && ${powershell} cmake `${getwslpath} ${srcdir}` -DTARGET_NAME=${targetname} \
-		-DIN1_SIZE=${in1_size} -DIN2_SIZE=${in2_size} -DOUT_SIZE=${out_size}
+	cd _build && ${powershell} cmake `${getwslpath} ${srcdir}` -DTARGET_NAME=${targetname}
 	cd _build && ${powershell} cmake --build . --config Release
 ifeq "${powershell}" "powershell.exe"
 	cp _build/${targetname}.exe $@
@@ -96,24 +95,8 @@ else
 	cp _build/${targetname} $@
 endif
 
-run: ${targetname}.exe build/final.xclbin build/insts.bin
-	${powershell} ./$< -x build/final.xclbin -i build/insts.bin -k MLIR_AIE --verbosity ${verbose}
+run: ${targetname}.exe $(xclbin_targets)
+	${powershell} ./$< -k MLIR_AIE --verbosity ${verbose}
 
-run_py: build/final.xclbin build/insts.bin
-	${powershell} python3 ${srcdir}/test.py -x build/final.xclbin -i build/insts.bin -k MLIR_AIE
-
-trace: ${targetname}.exe build/final_trace.xclbin build/insts.bin
-	${powershell} ./$< -x build/final_trace.xclbin -i build/insts.bin -k MLIR_AIE -t ${trace_size}
-	${srcdir}/../../../python/utils/trace/parse.py --input trace.txt --mlir build/aie2_trace_lineBased_8b.mlir --output trace_align.json
-	${srcdir}/../../../python/utils/trace/get_trace_summary.py --input trace_align.json
-
-trace_py: build/final_trace.xclbin build/insts.bin
-	${powershell} python3 ${srcdir}/test.py -x build/final_trace.xclbin -i build/insts.bin -k MLIR_AIE -t ${trace_size}
-	${srcdir}/../../../python/utils/trace/parse.py --input trace.txt --mlir build/aie2_trace_lineBased_8b.mlir --output trace_align.json
-	${srcdir}/../../../python/utils/trace/get_trace_summary.py --input trace_align.json
-
-clean_trace:
-	rm -rf tmpTrace trace.txt parse*json trace*json
-
-clean: clean_trace
+clean:
 	rm -rf build _build ${targetname}.exe

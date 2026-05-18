@@ -36,15 +36,37 @@ struct AlignmentTest {
   const char *query;
   uint32_t ref_len;
   uint32_t query_len;
+  const char *build_dir; // path to build/<r>x<q>/ containing final.xclbin and insts.bin
 };
 
-#define ATEST(name, ref, query) { name, ref, query, (int)__builtin_strlen(ref), (int)__builtin_strlen(query) }
+#define ATEST(name, ref, query, build_dir) \
+  { name, ref, query, (int)__builtin_strlen(ref), (int)__builtin_strlen(query), build_dir }
 
-static const AlignmentTest tests[] = {
-  ATEST("ATCG_32x32" , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
+// --- 32x32 tests ---
+static const AlignmentTest tests32x32[] = {
+  ATEST("ATCG_32x32", "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT", "build/32x32"),
+};
+
+// --- 32x64 tests ---
+static const AlignmentTest tests32x64[] = {
+  ATEST("ATCG_32x64",
+        "TTTTCACTTAAAGTATTATGCACGACAGGGTG",
+        "CGTGTACCATGTAAACCTGTTATAACTTACCTCGTGTACCATGTAAACCTGTTATAACTTACCT",
+        "build/32x64"),
+};
+
+// Flat list of all tests across all sizes — add new arrays here
+static const AlignmentTest *all_test_groups[] = {
+  tests32x32,
+  tests32x64,
+};
+static const size_t all_test_group_sizes[] = {
+  sizeof(tests32x32) / sizeof(tests32x32[0]),
+  sizeof(tests32x64) / sizeof(tests32x64[0]),
 };
 
 static const AlignmentTest *g_test = nullptr;
+static std::string g_base_dir; // directory of the executable, for resolving build paths
 
 void initialize_ref(DATATYPE_IN *seq, int seqLen) {
   for (int i = 0; i < seqLen; i++)
@@ -127,6 +149,10 @@ int runTest(const AlignmentTest &t, args myargs) {
   uint32_t QRY_VOLUME = t.query_len;
   uint32_t OUT_VOLUME = out_elems;
 
+  // Point to the size-specific build artifacts
+  myargs.xclbin = g_base_dir + t.build_dir + "/final.xclbin";
+  myargs.instr  = g_base_dir + t.build_dir + "/insts.bin";
+
   std::cout << "=== Test: " << t.name << " ===\n";
   return setup_and_align_aie<DATATYPE_IN, DATATYPE_OUT,
                            initialize_ref, initialize_qry,
@@ -142,9 +168,17 @@ int runTest(const AlignmentTest &t, args myargs) {
 int main(int argc, const char *argv[]) {
   args myargs = parse_args(argc, argv);
 
+  // Derive base directory from executable path so build/ is always found
+  // relative to the test binary location, regardless of cwd.
+  std::string exe(argv[0]);
+  auto slash = exe.find_last_of('/');
+  g_base_dir = (slash != std::string::npos) ? exe.substr(0, slash + 1) : "";
+
   int return_code = 0;
-  for (const auto &t : tests)
-    return_code |= runTest(t, myargs);
+  constexpr size_t n_groups = sizeof(all_test_groups) / sizeof(all_test_groups[0]);
+  for (size_t g = 0; g < n_groups; ++g)
+    for (size_t i = 0; i < all_test_group_sizes[g]; ++i)
+      return_code |= runTest(all_test_groups[g][i], myargs);
 
   return return_code;
 }

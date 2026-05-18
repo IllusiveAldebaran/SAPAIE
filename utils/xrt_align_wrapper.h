@@ -38,8 +38,9 @@ struct args parse_args(int argc, const char *argv[]) {
   myargs.n_iterations = vm["iters"].as<int>();
   myargs.n_warmup_iterations = vm["warmup"].as<int>();
   myargs.trace_size = vm["trace_sz"].as<int>();
-  myargs.instr = vm["instr"].as<std::string>();
-  myargs.xclbin = vm["xclbin"].as<std::string>();
+  // xclbin and instr are optional at parse time; runTest sets them per-test
+  myargs.instr  = vm.count("instr")  ? vm["instr"].as<std::string>()  : "";
+  myargs.xclbin = vm.count("xclbin") ? vm["xclbin"].as<std::string>() : "";
   myargs.kernel = vm["kernel"].as<std::string>();
   myargs.trace_file = vm["trace_file"].as<std::string>();
 
