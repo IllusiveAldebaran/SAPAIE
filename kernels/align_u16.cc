@@ -36,8 +36,8 @@ constexpr uint16_t sat_sub_u16(uint16_t a, uint16_t b) {
 const int32_t SMAX = 127;
 const int32_t SMIN = 128;
 /*****************************************************************************
- * Alignment of 2 sequences of length 16
- * Characters for sequence (unencoded) and uint16_t for scores
+ * Alignment of 2 sequences of arbitrary length
+ * Characters (uint8_t) for sequence (unencoded) and uint16_t for scores
  * Note that everything begins at 1 as 0 is the score on the edge
  * EX: with -1 for mismatch scores, match=1, gap=2 (for both)
  *         T   G   A   A   A   T   T   T   T   G   T   T   G   C   A   G
@@ -61,24 +61,24 @@ const int32_t SMIN = 128;
  * G | 0   0   1   0   0   1   0   0   0   0   1   0   0   1   0   3   6
  *
  **************************************************************************/
-void align_ch_u16_scalar(char *r_seq, char *q_seq,
-                        uint16_t* DPMatrix) {
+void align_ch_u16_scalar(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint32_t qryLen,
+                        uint16_t* DP) {
   event0();
-  const size_t RLEN = 16;
-  const size_t QLEN = 16;
-  // Our DP has padding of 0, so index by one off when getting to DP different from ref and query
-  uint16_t (*DP)[RLEN+1] = reinterpret_cast<uint16_t(*)[RLEN+1]>(DPMatrix);
 
-  for(size_t r_ind = 1; r_ind <= RLEN; r_ind++) {
-    for(size_t q_ind = 1; q_ind <= QLEN; q_ind++) {
+  // Our DP has padding of 0, so index by one off when getting to DP different from ref and query
+  const size_t DP_COLS = refLen+1;
+  const size_t DP_ROWS = qryLen+1;
+
+  for(size_t refInd = 1; refInd < DP_COLS; refInd++) {
+    for(size_t qryInd = 1; qryInd < DP_ROWS; qryInd++) {
       // calculate DP score
       uint16_t score = 0;
 
-      uint16_t score_ins = sat_sub_u16(DP[q_ind - 1][r_ind], INS_PENALTY);
-      uint16_t score_del = sat_sub_u16(DP[q_ind][r_ind - 1], DEL_PENALTY);
-      uint16_t score_diag = DP[q_ind - 1][r_ind - 1];
+      uint16_t score_ins = sat_sub_u16(DP[(qryInd - 1)*DP_COLS + refInd], INS_PENALTY);
+      uint16_t score_del = sat_sub_u16(DP[qryInd*DP_COLS + (refInd - 1)], DEL_PENALTY);
+      uint16_t score_diag = DP[(qryInd - 1)*DP_COLS + (refInd - 1)];
 
-      if(r_seq[r_ind - 1] == q_seq[q_ind - 1]) {
+      if(refSeq[refInd - 1] == qrySeq[qryInd - 1]) {
         score_diag = score_diag + MATCH_SCORE;
       } else {
         score_diag = sat_sub_u16(score_diag, MISMATCH_SCORE);
@@ -90,7 +90,7 @@ void align_ch_u16_scalar(char *r_seq, char *q_seq,
       score = (score > score_diag) ? score : score_diag;
 
       // write back
-      DP[q_ind][r_ind] = score;
+      DP[qryInd*DP_COLS + refInd] = score;
     }
   }
 
@@ -247,12 +247,12 @@ void align_u16_vector(int8_t *input, int8_t *kernels, int8_t *output,
 //*****************************************************************************
 extern "C" {
 
+void align_ch_u16(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint32_t qryLen, uint16_t* DPMatrix){
 #ifdef ALIGN_SCALAR
-void align_ch_u16(char *input, char *kernels, uint16_t *output) {
-  align_ch_u16_scalar(input, kernels, output);
-}
+  align_ch_u16_scalar(refSeq, refLen, qrySeq, qryLen, DPMatrix);
 #else
 #error "align_ch_u16 vector implementation not yet implemented — compile with -DALIGN_SCALAR"
 #endif // ALIGN_SCALAR
+}
 
 } // extern "C"

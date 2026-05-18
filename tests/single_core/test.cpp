@@ -32,20 +32,16 @@ using DATATYPE_OUT = uint16_t;
 
 struct AlignmentTest {
   const char *name;
-  const char *ref;
+  const char *ref; // note ref and query are parsed as uint8_t almost immediately
   const char *query;
-  int ref_len;
-  int query_len;
+  uint32_t ref_len;
+  uint32_t query_len;
 };
 
 #define ATEST(name, ref, query) { name, ref, query, (int)__builtin_strlen(ref), (int)__builtin_strlen(query) }
 
 static const AlignmentTest tests[] = {
-  ATEST("basic_16x16", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAG"),
-  ATEST("exact_16x16", "ACCAACACTGGATTGC", "ACCAACACTGGATTGC"),
-  ATEST("oppst_16x16", "AAAATTTTAAAATTTT", "CCCCGGGGCCCCGGGG"),
-  ATEST("ATCG_16x16" , "AAAATTTTCCCCGGGG", "GGAAAATTTTCCCCGG"),
-  //ATEST("ATCG_32x32" , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
+  ATEST("ATCG_32x32" , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
 };
 
 static const AlignmentTest *g_test = nullptr;

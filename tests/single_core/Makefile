@@ -34,9 +34,12 @@ PEANOWRAP2P_FLAGS += -DALIGN_SCALAR
 
 devicename ?= $(if $(filter 1,$(NPU2)),npu2,npu)
 targetname = align_npu
-in1_size = 16  # 16 chars (bytes)
-in2_size = 16  # 16 chars (bytes)
-out_size = 584 # 292 uint16_t * 2 bytes (289 valid + 3 pad for 4-byte DMA alignment)
+ref_len   ?= 16
+qry_len   ?= 16
+in1_size   = $(ref_len)
+in2_size   = $(qry_len)
+# out_size: (qry_len+1)*(ref_len+1) rounded up to even uint16, times 2 bytes
+out_size   = $(shell python3 -c "r=$(ref_len);q=$(qry_len);n=(q+1)*(r+1);print(((n+1)//2)*2*2)")
 trace_size = 8192
 CHESS ?= false
 CHESS ?= false
@@ -62,11 +65,11 @@ endif
 
 build/aie2_lineBased_8b.mlir: ${srcdir}/${aie_py_src}
 	mkdir -p ${@D}
-	python3 $< -d ${devicename} > $@
+	python3 $< -d ${devicename} --ref-len ${ref_len} --qry-len ${qry_len} > $@
 
 build/aie2_trace_lineBased_8b.mlir: ${srcdir}/${aie_py_src}
 	mkdir -p ${@D}
-	python3 $< -d ${devicename} -t ${trace_size} > $@
+	python3 $< -d ${devicename} -t ${trace_size} --ref-len ${ref_len} --qry-len ${qry_len} > $@
 
 build/final.xclbin: build/aie2_lineBased_8b.mlir build/align_u16.cc.o
 	mkdir -p ${@D}
