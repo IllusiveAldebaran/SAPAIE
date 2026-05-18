@@ -43,7 +43,7 @@ aie_py_src=${targetname}_placed.py
 
 # Space-separated list of ref_len:qry_len size pairs to build xclbins for.
 # Builds for tests suite. Specify which type if you want to only do specific ones.
-TEST_SIZES ?= 16:16 32:32 32:64 80:80 88:88 60:132
+TEST_SIZES ?= 16:16 32:32 32:64 80:80 88:88 60:132 244:32
 
 # Derive all per-size xclbin paths
 xclbin_targets := $(foreach sz,$(TEST_SIZES),build/$(subst :,x,$(sz))/final.xclbin)
