@@ -80,7 +80,7 @@ int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, 
   if (errors == 0) {
     if(verbosity >= 1)
       printf("Realigning on CPU for comparison\n");
-    DATATYPE_OUT *DPCPU = (DATATYPE_OUT *)malloc(dp_cols * dp_rows * sizeof(DATATYPE_OUT));
+    DATATYPE_OUT *DPCPU = (DATATYPE_OUT *)calloc(dp_cols * dp_rows * sizeof(DATATYPE_OUT));
 
     // Test on CPU
     fillDPSmithWaterman(refSeq, refLen, qrySeq, qryLen, DPCPU);

@@ -19,7 +19,7 @@
 #include <vector>
 #include <cctype>
 
-#include "seq_utils.h"
+#include "utils/seq_utils.h"
 
 int main(int argc, char * const argv[]) {
   if (argc != 3) {
@@ -64,12 +64,17 @@ int main(int argc, char * const argv[]) {
   printf("\n");
   */
 
-  uint16_t* DP = (uint16_t*)malloc((refLen+1)*(qryLen+1)*sizeof(uint16_t));
+  uint16_t* DP = (uint16_t*)calloc((refLen+1)*(qryLen+1), sizeof(uint16_t));
+  uint16_t* DPD = (uint16_t*)calloc((refLen+1+qryLen)*(qryLen+1), sizeof(uint16_t));
   
   // calculate DP matrix and return it
   fillDPSmithWaterman(refSeq, refLen, qrySeq, qryLen, DP);
 
+  // fill DP rectangular matrix to diagonal matrix (padded in this case)
+  fillDPtoDPD(DP, DPD, refLen+1, qryLen+1);
+
   showDP(refSeq, refLen, qrySeq, refLen, DP);
+  showDP(refSeq, refLen, qrySeq, refLen, DPD, true);
 
 
   free(refSeq);

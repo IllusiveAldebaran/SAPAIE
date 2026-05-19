@@ -54,7 +54,7 @@ inline constexpr uint16_t sw_score(uint8_t* refSeq, uint32_t refInd, uint32_t re
   uint16_t score_horiz;
   uint16_t score_vert;
 
-  // initializing the diag score, not ye(t deciding whether to match or not
+  // initializing the diag score, not yet deciding whether to match or not
   score_horiz = DP[DP_COLS * qryInd + refInd - 1];
   score_vert  = DP[DP_COLS * (qryInd - 1) + refInd];
   score_diag  = DP[DP_COLS * (qryInd - 1) + refInd - 1];
@@ -81,13 +81,27 @@ inline void fillDPSmithWaterman(uint8_t* refSeq, uint32_t refLen,
   const size_t DP_COLS = refLen+1;
   const size_t DP_ROWS = qryLen+1;
 
-  for (size_t j = 0; j <= static_cast<int>(qryLen); j++)
-    for (size_t i = 0; i <= static_cast<int>(refLen); i++)
+  // we initialize with calloc, so no need to set boundaries to 0
+  for (size_t j = 1; j <= static_cast<int>(qryLen); j++)
+    for (size_t i = 1; i <= static_cast<int>(refLen); i++)
       DP[j * DP_COLS + i] = sw_score(refSeq, i, refLen, qrySeq, j, qryLen, DP);
 }
 
+/* Converts from DP regular matrix to DPD filled elements.
+ * Just needs to stagger everything
+ * Assumes memory is accurately sized
+ */
+inline void fillDPtoDPD(uint16_t* DP, uint16_t* DPD,
+                                const uint32_t DP_COLS, const uint32_t DP_ROWS) {
+
+  for (size_t i = 1; i < DP_COLS; i++)
+    for (size_t j = 0; j < DP_ROWS; j++)
+      DPD[(j+i)*DP_COLS + i] = DP[j*DP_COLS + i];
+}
+
 // prints the alignment DP matrix and sequences
-void showDP(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, uint16_t* DP) {
+// If diagonally aligned then prints out differently
+void showDP(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, uint16_t* DP, bool diagAligned=false) {
   const size_t DP_COLS = refLen+1;
   const size_t DP_ROWS = qryLen+1;
 
@@ -98,18 +112,35 @@ void showDP(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, 
     printf("   %c", refSeq[i]);
   }
   printf("\n");
-  printf("   +—————————————————————————————————————————————————————————————————————\n");
+  printf("%c  +—————————————————————————————————————————————————————————————————————\n", (diagAligned)?(char)qrySeq[0] : ' ');
   
-  for(int j = 0; j<DP_ROWS; j++) {
-    if(j != 0)
-      printf(" %c |", qrySeq[j-1]); // we are doing one more than needed
-    else
-      printf("   |");
+  if(!diagAligned) {
+    for(int j = 0; j<DP_ROWS; j++) {
+      if(j != 0)
+        printf(" %c |", qrySeq[j-1]); // we are doing one more than needed
+      else
+        printf("   |");
 
-    for(int i = 0; i<DP_COLS; i++) {
-      printf(" %3d", DP[j*(DP_COLS)+i]);
+      for(int i = 0; i<DP_COLS; i++) {
+        printf(" %3d", DP[j * DP_COLS + i]);
+      }
+      printf("\n");
     }
-    printf("\n");
+  } else {
+    for(int j = 0; j<DP_ROWS + DP_COLS - 1; j++) {
+      if(j == 0)
+        printf("%c  |", qrySeq[j+1]);
+      else if(j > 0 && j < DP_ROWS-2)
+        printf("%c  |", qrySeq[j+1]);
+      else
+        printf("   |");
+
+      for(int i = 0; i<DP_COLS; i++) {
+        printf(" %3d", DP[j * DP_COLS + i]);
+      }
+      printf("\n");
+    }
+
   }
   
 
