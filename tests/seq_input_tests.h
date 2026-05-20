@@ -22,6 +22,11 @@ static inline const char *atest_build_dir(const AlignmentTest &t) {
   snprintf(buf, sizeof(buf), "build/%ux%u", t.ref_len, t.query_len);
   return buf;
 }
+// --- 8x16 tests ---
+static const AlignmentTest tests8x16[] = {
+  ATEST("basic_8x16", "TGATTTAG", "TGACTTTGCTATGCAG"),
+  ATEST("exact_8x16", "ACCAGATC", "ACCAACACTGGATTGC"),
+};
 
 // --- 16x16 tests ---
 static const AlignmentTest tests16x16[] = {
@@ -88,6 +93,7 @@ static const AlignmentTest tests244x32[] = {
 
 // Flat list of all tests across all sizes — add new arrays here
 static const AlignmentTest *all_test_groups[] = {
+  tests8x16,
   tests16x16,
   tests32x32,
   tests32x64,
@@ -97,6 +103,7 @@ static const AlignmentTest *all_test_groups[] = {
   tests244x32,
 };
 static const size_t all_test_group_sizes[] = {
+  sizeof(tests8x16) / sizeof(tests8x16[0]),
   sizeof(tests16x16) / sizeof(tests16x16[0]),
   sizeof(tests32x32) / sizeof(tests32x32[0]),
   sizeof(tests32x64) / sizeof(tests32x64[0]),

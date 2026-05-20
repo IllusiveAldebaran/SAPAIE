@@ -97,6 +97,54 @@ void align_ch_u16_scalar(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint
   event1();
 }
 
+/* Diagonally prealigned 
+ * Changes the algorithm in memory accesses, but it is essentially the same.
+ */
+void alignD_ch_u16_scalar(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint32_t qryLen,
+                        uint16_t* DP) {
+  event0();
+
+  // Our DP has padding of 0, so index by one off when getting to DP different from ref and query
+  const size_t DP_COLS = refLen+1;
+  const size_t DP_ROWS = qryLen+1;
+
+  for(size_t dy = 2; dy < DP_ROWS + DP_COLS - 1; dy++) {
+    for(size_t dx = 1; dx < DP_COLS; dx++) {
+    // iterate through all cols but select to do run the alignment algorithm or not.
+    // Makes vectorization (and possibly later on batched alignment) possible
+      // check beyond diagonal. 
+      // Example in (dy, dx) (2, 3) does not exist as its padded area
+      if(dx >= dy || dy-dx >= (DP_ROWS)) {
+        // The exactly diagonal across DP is all 0s or just padded values
+      } else {
+        // calculate DP score
+        uint16_t score = 0;
+
+        uint16_t score_ins = sat_sub_u16(DP[(dy - 1)*DP_COLS + dx], INS_PENALTY);
+        uint16_t score_del = sat_sub_u16(DP[(dy - 1)*DP_COLS + (dx - 1)], DEL_PENALTY);
+        uint16_t score_diag = DP[(dy - 2)*DP_COLS + (dx - 1)];
+
+        if(refSeq[dx - 1] == qrySeq[(dy-dx) - 1]) {
+          score_diag = score_diag + MATCH_SCORE;
+        } else {
+          score_diag = sat_sub_u16(score_diag, MISMATCH_SCORE);
+        }
+        
+        // decide on the score
+        score = (score > score_ins ) ? score : score_ins;
+        score = (score > score_del ) ? score : score_del;
+        score = (score > score_diag) ? score : score_diag;
+
+        // write back
+        DP[dy*DP_COLS + dx] = score;
+      }
+    }
+  }
+
+  event1();
+}
+
+
 #else // Vectorized Kernel
 
 
@@ -253,6 +301,14 @@ void align_ch_u16(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint32_t qr
 #else
 #error "align_ch_u16 vector implementation not yet implemented — compile with -DALIGN_SCALAR"
 #endif // ALIGN_SCALAR
+}
+
+void alignD_ch_u16(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint32_t qryLen, uint16_t* DPMatrix){
+#ifdef ALIGN_SCALAR
+  alignD_ch_u16_scalar(refSeq, refLen, qrySeq, qryLen, DPMatrix);
+#else
+#error "alignD_ch_u16 vector implementation not yet implemented — compile with -DALIGN_SCALAR"
+#endif
 }
 
 } // extern "C"

@@ -70,7 +70,7 @@ int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, 
     }
   }
   // Check boundary column (col 0 of each row)
-  for (size_t row = 0; row < dp_rows; row++) {
+  for (size_t row = 0; row < dp_rows + dp_cols - 1; row++) {
     if (DP[row * dp_cols] != 0) {
       if (verbosity >= 1)
         std::cout << "Boundary error at [" << row << "][0]: got "
@@ -90,7 +90,7 @@ int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, 
       printf("Verifying Final DP Matrix...\n");
     for (size_t j = 0; j < dp_rows; j++)
       for (size_t i = 0; i < dp_cols; i++)
-        if (DPCPU[j * dp_cols + i] != DP[j * dp_cols + i])
+        if (DPCPU[j * dp_cols + i] != DP[(j+i) * dp_cols + i])
           errors++;
 
     if (errors != 0) {
@@ -103,7 +103,7 @@ int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, 
 
   if (errors != 0) {
     printf("Errors! %d errors accumulated over mismatched DP scores\n", errors);
-    showDP(refSeq, refLen, qrySeq, qryLen, DP);
+    showDP(refSeq, refLen, qrySeq, qryLen, DP, true);
   }
 
   return errors;
@@ -113,7 +113,8 @@ int runTest(const AlignmentTest &t, args myargs) {
   g_test = &t;
   const int dp_rows = t.query_len + 1;
   const int dp_cols = t.ref_len + 1;
-  const int out_elems = ((dp_rows * dp_cols + 3) / 4) * 4;
+  // doing aligned kernel dp is based on diagonals
+  const int out_elems = (((dp_rows + dp_cols - 1) * dp_cols + 3) / 4) * 4;
 
   uint32_t REF_VOLUME = t.ref_len;
   uint32_t QRY_VOLUME = t.query_len;

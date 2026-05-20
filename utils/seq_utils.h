@@ -112,7 +112,9 @@ void showDP(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, 
     printf("   %c", refSeq[i]);
   }
   printf("\n");
-  printf("%c  +—————————————————————————————————————————————————————————————————————\n", (diagAligned)?(char)qrySeq[0] : ' ');
+  printf("%c  +", (diagAligned)?(char)qrySeq[0] : ' ');
+  for(int i = 0; i <= refLen; i++) printf("————");
+  printf("\n");
   
   if(!diagAligned) {
     for(int j = 0; j<DP_ROWS; j++) {
