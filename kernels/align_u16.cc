@@ -97,47 +97,75 @@ void align_ch_u16_scalar(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint
   event1();
 }
 
-/* Diagonally prealigned 
+/* Diagonally prealigned
  * Changes the algorithm in memory accesses, but it is essentially the same.
  */
 void alignD_ch_u16_scalar(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uint32_t qryLen,
                         uint16_t* DP) {
   event0();
 
-  // Our DP has padding of 0, so index by one off when getting to DP different from ref and query
+  // uint16_t needs min 128 bits = 8 elements on AIE2
+  constexpr int VEC = 8;
+
   const size_t DP_COLS = refLen+1;
   const size_t DP_ROWS = qryLen+1;
 
   for(size_t dy = 2; dy < DP_ROWS + DP_COLS - 1; dy++) {
-    for(size_t dx = 1; dx < DP_COLS; dx++) {
-    // iterate through all cols but select to do run the alignment algorithm or not.
-    // Makes vectorization (and possibly later on batched alignment) possible
-      // check beyond diagonal. 
-      // Example in (dy, dx) (2, 3) does not exist as its padded area
-      if(dx >= dy || dy-dx >= (DP_ROWS)) {
-        // The exactly diagonal across DP is all 0s or just padded values
-      } else {
-        // calculate DP score
-        uint16_t score = 0;
+    size_t dx_lo = (dy >= DP_ROWS) ? (dy - DP_ROWS + 1) : 1;
+    size_t dx_hi = (dy - 1 < DP_COLS - 1) ? (dy - 1) : (DP_COLS - 1);
 
-        uint16_t score_ins = sat_sub_u16(DP[(dy - 1)*DP_COLS + dx], INS_PENALTY);
-        uint16_t score_del = sat_sub_u16(DP[(dy - 1)*DP_COLS + (dx - 1)], DEL_PENALTY);
-        uint16_t score_diag = DP[(dy - 2)*DP_COLS + (dx - 1)];
+    size_t dx = dx_lo;
 
-        if(refSeq[dx - 1] == qrySeq[(dy-dx) - 1]) {
-          score_diag = score_diag + MATCH_SCORE;
-        } else {
-          score_diag = sat_sub_u16(score_diag, MISMATCH_SCORE);
-        }
-        
-        // decide on the score
-        score = (score > score_ins ) ? score : score_ins;
-        score = (score > score_del ) ? score : score_del;
-        score = (score > score_diag) ? score : score_diag;
-
-        // write back
-        DP[dy*DP_COLS + dx] = score;
+    // --- vectorized section (all VEC lanes must be within valid range) ---
+    for(; dx + VEC - 1 <= dx_hi; dx += VEC) {
+      // gather ref and query chars as uint16_t — uint8_t vectors need 16 elems minimum
+      uint16_t refbuf[VEC], qbuf[VEC];
+      for(int k = 0; k < VEC; k++) {
+        refbuf[k] = refSeq[dx + k - 1];
+        qbuf[k]   = qrySeq[(dy - (dx + k)) - 1];
       }
+      aie::vector<uint16_t, VEC> vref  = aie::load_v<VEC>(refbuf);
+      aie::vector<uint16_t, VEC> vqry  = aie::load_v<VEC>(qbuf);
+
+      aie::vector<uint16_t, VEC> vscore_ins  = aie::load_unaligned_v<VEC>(DP + (dy-1)*DP_COLS + dx);
+      aie::vector<uint16_t, VEC> vscore_del  = aie::load_unaligned_v<VEC>(DP + (dy-1)*DP_COLS + dx - 1);
+      aie::vector<uint16_t, VEC> vscore_diag = aie::load_unaligned_v<VEC>(DP + (dy-2)*DP_COLS + dx - 1);
+
+      aie::vector<uint16_t, VEC> vpen_ins  = aie::broadcast<uint16_t, VEC>(INS_PENALTY);
+      aie::vector<uint16_t, VEC> vpen_mis  = aie::broadcast<uint16_t, VEC>(MISMATCH_SCORE);
+      aie::vector<uint16_t, VEC> vpen_del  = aie::broadcast<uint16_t, VEC>(DEL_PENALTY);
+      aie::vector<uint16_t, VEC> vmatch    = aie::broadcast<uint16_t, VEC>(MATCH_SCORE);
+
+      // saturating sub: clamp value >= penalty before subtracting so uint never wraps
+      vscore_ins = aie::sub(aie::max(vscore_ins, vpen_ins), vpen_ins);
+      vscore_del = aie::sub(aie::max(vscore_del, vpen_del), vpen_del);
+
+      aie::mask<VEC> match_mask = aie::eq(vref, vqry);
+      aie::vector<uint16_t, VEC> vdiag_match = aie::add(vscore_diag, vmatch);
+      aie::vector<uint16_t, VEC> vdiag_mis   = aie::sub(aie::max(vscore_diag, vpen_mis), vpen_mis);
+      vscore_diag = aie::select(vdiag_mis, vdiag_match, match_mask);
+
+      aie::vector<uint16_t, VEC> vscore = aie::max(aie::max(vscore_ins, vscore_del), vscore_diag);
+
+      aie::store_unaligned_v(DP + dy*DP_COLS + dx, vscore);
+    }
+
+    // --- scalar remainder ---
+    for(; dx <= dx_hi; dx++) {
+      uint16_t score = 0;
+      uint16_t score_ins  = sat_sub_u16(DP[(dy-1)*DP_COLS + dx],     INS_PENALTY);
+      uint16_t score_del  = sat_sub_u16(DP[(dy-1)*DP_COLS + dx - 1], DEL_PENALTY);
+      uint16_t score_diag = DP[(dy-2)*DP_COLS + dx - 1];
+
+      if(refSeq[dx-1] == qrySeq[(dy-dx) - 1])
+        score_diag = score_diag + MATCH_SCORE;
+      else
+        score_diag = sat_sub_u16(score_diag, MISMATCH_SCORE);
+
+      score = (score > score_ins)  ? score : score_ins;
+      score = (score > score_del)  ? score : score_del;
+      score = (score > score_diag) ? score : score_diag;
+      DP[dy*DP_COLS + dx] = score;
     }
   }
 
