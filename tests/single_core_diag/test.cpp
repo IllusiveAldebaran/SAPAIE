@@ -39,13 +39,19 @@ static const AlignmentTest *g_test = nullptr;
 static std::string g_base_dir; // directory of the executable, for resolving build paths
 
 void initialize_ref(DATATYPE_IN *seq, int seqLen) {
-  for (int i = 0; i < seqLen; i++)
+  for (size_t i = 0; i < seqLen; i++)
     seq[i] = (uint8_t)g_test->ref[i];
+  // pad out sequence so it is 4 byte aligned (mlir requirement)
+  for (size_t i = seqLen; i < seqLen + (4 - seqLen % 4) % 4; i++)
+    seq[i] = (uint8_t)'P';
 }
 
 void initialize_qry(DATATYPE_IN *seq, int seqLen) {
-  for (int i = 0; i < seqLen; i++)
+  for (size_t i = 0; i < seqLen; i++)
     seq[i] = (uint8_t)g_test->query[i];
+  // pad out sequence so it is 4 byte aligned (mlir requirement)
+  for (size_t i = seqLen; i < seqLen + (4 - seqLen % 4) % 4; i++)
+    seq[i] = (uint8_t)'P';
 }
 
 // Zero output buffer
@@ -78,7 +84,7 @@ int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, 
       errors++;
     }
   }
-  if (errors == 0) {
+  if (errors == 0 || verbosity > 0) {
     if(verbosity >= 1)
       printf("Realigning on CPU for comparison\n");
     DATATYPE_OUT *DPCPU = (DATATYPE_OUT *)calloc(dp_cols * dp_rows, sizeof(DATATYPE_OUT));

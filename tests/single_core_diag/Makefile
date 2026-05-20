@@ -28,9 +28,13 @@ PEANOWRAP2P_FLAGS = -O2 -std=c++20 --target=aie2p-none-unknown-elf ${WARNING_FLA
 
 ####
 
+scalar?=0
 # Custom Flags for kernel
-PEANOWRAP2_FLAGS += -DALIGN_SCALAR
-PEANOWRAP2P_FLAGS += -DALIGN_SCALAR
+ifeq ($(scalar), 1)
+	PEANOWRAP2_FLAGS += -DALIGN_SCALAR
+	PEANOWRAP2P_FLAGS += -DALIGN_SCALAR
+endif
+
 
 devicename ?= $(if $(filter 1,$(NPU2)),npu2,npu)
 targetname = align_npu
@@ -43,8 +47,7 @@ aie_py_src=${targetname}_placed.py
 
 # Space-separated list of ref_len:qry_len size pairs to build xclbins for.
 # Builds for tests suite. Specify which type if you want to only do specific ones.
-# Stricter than single_kernel as now it is drawing (refLen-1)*(qryLen) more memory for the diagonals w/padding
-TEST_SIZES ?= 8:16 16:16 32:32 32:64 80:80
+TEST_SIZES ?= 7:7 8:16 16:16 32:32 32:64
 	# 80:80 88:88 60:132  Should not pass as it warns a failed to allocate buffer, yet these work
 	# 244:32 Does not work at all
 

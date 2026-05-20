@@ -22,6 +22,12 @@ static inline const char *atest_build_dir(const AlignmentTest &t) {
   snprintf(buf, sizeof(buf), "build/%ux%u", t.ref_len, t.query_len);
   return buf;
 }
+
+// --- 7x7 tests ---
+static const AlignmentTest tests7x7[] = {
+  ATEST("basic_7x7", "TATTTAG", "TGTACAG"),
+};
+
 // --- 8x16 tests ---
 static const AlignmentTest tests8x16[] = {
   ATEST("basic_8x16", "TGATTTAG", "TGACTTTGCTATGCAG"),
@@ -48,6 +54,11 @@ static const AlignmentTest tests32x64[] = {
   ATEST("ATCG_32x64",
         "TTTTCACTTAAAGTATTATGCACGACAGGGTG",
         "CGTGTACCATGTAAACCTGTTATAACTTACCTCGTGTACCATGTAAACCTGTTATAACTTACCT"),
+};
+
+// --- 31x33 tests ---
+static const AlignmentTest tests31x33[] = {
+  ATEST("basic_31x33", "GTAGGGTTGGACCGCACGCATGTTAAACTGC", "TGGCGAACCGCGATTCCACGACCGGTGCACGAT"),
 };
 
 
@@ -93,20 +104,24 @@ static const AlignmentTest tests244x32[] = {
 
 // Flat list of all tests across all sizes — add new arrays here
 static const AlignmentTest *all_test_groups[] = {
+  tests7x7,
   tests8x16,
   tests16x16,
   tests32x32,
   tests32x64,
+  tests31x33,
   tests80x80,
   tests88x88,
   tests60x132,
   tests244x32,
 };
 static const size_t all_test_group_sizes[] = {
+  sizeof(tests7x7) / sizeof(tests7x7[0]),
   sizeof(tests8x16) / sizeof(tests8x16[0]),
   sizeof(tests16x16) / sizeof(tests16x16[0]),
   sizeof(tests32x32) / sizeof(tests32x32[0]),
   sizeof(tests32x64) / sizeof(tests32x64[0]),
+  sizeof(tests31x33) / sizeof(tests31x33[0]),
   sizeof(tests80x80) / sizeof(tests80x80[0]),
   sizeof(tests88x88) / sizeof(tests88x88[0]),
   sizeof(tests60x132) / sizeof(tests60x132[0]),

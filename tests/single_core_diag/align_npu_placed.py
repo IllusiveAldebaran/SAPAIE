@@ -26,8 +26,11 @@ def my_align_kernel(dev, trace_size, ref_len, qry_len):
     in_dtype  = np.int8   # char encoded nucleotide
     out_dtype = np.uint16
 
-    in1_ty = np.ndarray[(ref_len,),   np.dtype[in_dtype]]
-    in2_ty = np.ndarray[(qry_len,),   np.dtype[in_dtype]]
+    # must align inputs to bytes of 4
+    ref_len_pad = ref_len + (4 - ref_len % 4) % 4
+    qry_len_pad = qry_len + (4 - qry_len % 4) % 4
+    in1_ty = np.ndarray[(ref_len_pad,), np.dtype[in_dtype]]
+    in2_ty = np.ndarray[(qry_len_pad,), np.dtype[in_dtype]]
     out_ty = np.ndarray[(out_elems,), np.dtype[out_dtype]]
 
     rtp_ty = np.ndarray[(1,), np.dtype[np.uint32]]
@@ -86,10 +89,10 @@ def my_align_kernel(dev, trace_size, ref_len, qry_len):
             rtp_qryLen[0] = qry_len
 
             in1_task = shim_dma_single_bd_task(
-                of_in1, inTensor1, sizes=[1, 1, 1, ref_len], issue_token=True
+                of_in1, inTensor1, sizes=[1, 1, 1, ref_len_pad], issue_token=True
             )
             in2_task = shim_dma_single_bd_task(
-                of_in2, inTensor2, sizes=[1, 1, 1, qry_len], issue_token=True
+                of_in2, inTensor2, sizes=[1, 1, 1, qry_len_pad], issue_token=True
             )
             out_task = shim_dma_single_bd_task(
                 of_out, outTensor, sizes=[1, 1, 1, out_elems], issue_token=True
