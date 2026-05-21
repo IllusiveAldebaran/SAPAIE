@@ -47,7 +47,7 @@ aie_py_src=${targetname}_placed.py
 
 # Space-separated list of ref_len:qry_len size pairs to build xclbins for.
 # Builds for tests suite. Specify which type if you want to only do specific ones.
-TEST_SIZES ?= 7:7 8:16 16:16 32:32 32:64
+TEST_SIZES ?= 7:7 8:16 16:16 16:17 32:32 32:64
 	# 80:80 88:88 60:132  Should not pass as it warns a failed to allocate buffer, yet these work
 	# 244:32 Does not work at all
 

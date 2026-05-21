@@ -42,6 +42,12 @@ static const AlignmentTest tests16x16[] = {
   ATEST("ATCG_16x16" , "AAAATTTTCCCCGGGG", "GGAAAATTTTCCCCGG"),
 };
 
+// --- 16x17 tests ---
+static const AlignmentTest tests16x17[] = {
+  ATEST("basic_16x17", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAGT"),
+};
+
+
 // --- 32x32 tests ---
 static const AlignmentTest tests32x32[] = {
   ATEST("ATCG_32x32"       , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
@@ -107,6 +113,7 @@ static const AlignmentTest *all_test_groups[] = {
   tests7x7,
   tests8x16,
   tests16x16,
+  tests16x17,
   tests32x32,
   tests32x64,
   tests31x33,
@@ -119,6 +126,7 @@ static const size_t all_test_group_sizes[] = {
   sizeof(tests7x7) / sizeof(tests7x7[0]),
   sizeof(tests8x16) / sizeof(tests8x16[0]),
   sizeof(tests16x16) / sizeof(tests16x16[0]),
+  sizeof(tests16x17) / sizeof(tests16x17[0]),
   sizeof(tests32x32) / sizeof(tests32x32[0]),
   sizeof(tests32x64) / sizeof(tests32x64[0]),
   sizeof(tests31x33) / sizeof(tests31x33[0]),

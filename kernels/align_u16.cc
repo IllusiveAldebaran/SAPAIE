@@ -180,18 +180,18 @@ void alignD_ch_u16_vector(uint8_t *refSeq, uint32_t refLen, uint8_t *qrySeq, uin
       aie::vector<uint16_t, VEC> vscore_del  = aie::load_unaligned_v<VEC>(DP + (dy-1)*DP_COLS + dx - 1);
       aie::vector<uint16_t, VEC> vscore_diag = aie::load_unaligned_v<VEC>(DP + (dy-2)*DP_COLS + dx - 1);
 
-      aie::vector<uint16_t, VEC> vpen_ins  = aie::broadcast<uint16_t, VEC>(INS_PENALTY);
-      aie::vector<uint16_t, VEC> vpen_mis  = aie::broadcast<uint16_t, VEC>(MISMATCH_SCORE);
-      aie::vector<uint16_t, VEC> vpen_del  = aie::broadcast<uint16_t, VEC>(DEL_PENALTY);
-      aie::vector<uint16_t, VEC> vmatch    = aie::broadcast<uint16_t, VEC>(MATCH_SCORE);
+      aie::vector<uint16_t, VEC> vINS_PENALTY  = aie::broadcast<uint16_t, VEC>(INS_PENALTY);
+      aie::vector<uint16_t, VEC> vMIS_PENALTY  = aie::broadcast<uint16_t, VEC>(MISMATCH_SCORE);
+      aie::vector<uint16_t, VEC> vDEL_PENALTY  = aie::broadcast<uint16_t, VEC>(DEL_PENALTY);
+      aie::vector<uint16_t, VEC> vMATCH_SCORE  = aie::broadcast<uint16_t, VEC>(MATCH_SCORE);
 
       // saturating sub: clamp value >= penalty before subtracting so uint never wraps
-      vscore_ins = aie::sub(aie::max(vscore_ins, vpen_ins), vpen_ins);
-      vscore_del = aie::sub(aie::max(vscore_del, vpen_del), vpen_del);
+      vscore_ins = aie::sub(aie::max(vscore_ins, vINS_PENALTY), vINS_PENALTY);
+      vscore_del = aie::sub(aie::max(vscore_del, vDEL_PENALTY), vDEL_PENALTY);
 
       aie::mask<VEC> match_mask = aie::eq(vref, vqry);
-      aie::vector<uint16_t, VEC> vdiag_match = aie::add(vscore_diag, vmatch);
-      aie::vector<uint16_t, VEC> vdiag_mis   = aie::sub(aie::max(vscore_diag, vpen_mis), vpen_mis);
+      aie::vector<uint16_t, VEC> vdiag_match = aie::add(vscore_diag, vMATCH_SCORE);
+      aie::vector<uint16_t, VEC> vdiag_mis   = aie::sub(aie::max(vscore_diag, vMIS_PENALTY), vMIS_PENALTY);
       vscore_diag = aie::select(vdiag_mis, vdiag_match, match_mask);
 
       aie::vector<uint16_t, VEC> vscore = aie::max(aie::max(vscore_ins, vscore_del), vscore_diag);
