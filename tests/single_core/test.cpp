@@ -35,7 +35,7 @@ using DATATYPE_OUT = uint16_t;
 
 #include "../seq_input_tests.h"
 
-static const AlignmentTest *g_test = nullptr;
+static const SeqPair *g_test = nullptr;
 static std::string g_base_dir; // directory of the executable, for resolving build paths
 
 void initialize_ref(DATATYPE_IN *seq, int seqLen) {
@@ -109,7 +109,7 @@ int verify_alignment(DATATYPE_IN *refSeq, uint32_t refLen, DATATYPE_IN *qrySeq, 
   return errors;
 }
 
-int runTest(const AlignmentTest &t, args myargs) {
+int runTest(const SeqPair &t, args myargs) {
   g_test = &t;
   const int dp_rows = t.query_len + 1;
   const int dp_cols = t.ref_len + 1;
@@ -120,8 +120,8 @@ int runTest(const AlignmentTest &t, args myargs) {
   uint32_t OUT_VOLUME = out_elems;
 
   // Point to the size-specific build artifacts
-  myargs.xclbin = g_base_dir + atest_build_dir(t) + "/final.xclbin";
-  myargs.instr  = g_base_dir + atest_build_dir(t) + "/insts.bin";
+  myargs.xclbin = g_base_dir + seq_pair_build_dir(t) + "/final.xclbin";
+  myargs.instr  = g_base_dir + seq_pair_build_dir(t) + "/insts.bin";
 
   std::cout << "=== Test: " << t.name << " ===\n";
   return setup_and_align_aie<DATATYPE_IN, DATATYPE_OUT,
@@ -147,7 +147,7 @@ int main(int argc, const char *argv[]) {
   int return_code = 0;
   constexpr size_t n_groups = sizeof(all_test_groups) / sizeof(all_test_groups[0]);
   for (size_t g = 0; g < n_groups; ++g) {
-    std::string dir = g_base_dir + atest_build_dir(all_test_groups[g][0]);
+    std::string dir = g_base_dir + seq_pair_build_dir(all_test_groups[g][0]);
     struct stat st;
     if (stat(dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
       if(myargs.verbosity > 1) {

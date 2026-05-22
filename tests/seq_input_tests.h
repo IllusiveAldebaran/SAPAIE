@@ -4,7 +4,7 @@
 #pragma once
 #include <cstdint>
 
-struct AlignmentTest {
+struct SeqPair {
   const char *name;
   const char *ref; // note ref and query are parsed as uint8_t almost immediately
   const char *query;
@@ -12,126 +12,119 @@ struct AlignmentTest {
   uint32_t query_len;
 };
 
-#define ATEST(name, ref, query) \
+#define SEQ_PAIR(name, ref, query) \
   { name, ref, query, (uint32_t)__builtin_strlen(ref), (uint32_t)__builtin_strlen(query) }
 
 // Returns "build/<ref_len>x<query_len>" — static buffer, not thread-safe.
 // Used to find place where the mlir kenrel for specific sizes are
-static inline const char *atest_build_dir(const AlignmentTest &t) {
+static inline const char *seq_pair_build_dir(const SeqPair &t) {
   static char buf[32];
   snprintf(buf, sizeof(buf), "build/%ux%u", t.ref_len, t.query_len);
   return buf;
 }
 
 // --- 7x7 tests ---
-static const AlignmentTest tests7x7[] = {
-  ATEST("basic_7x7", "TATTTAG", "TGTACAG"),
+static const SeqPair tests7x7[] = {
+  SEQ_PAIR("basic_7x7", "TATTTAG", "TGTACAG"),
 };
 
 // --- 8x16 tests ---
-static const AlignmentTest tests8x16[] = {
-  ATEST("basic_8x16", "TGATTTAG", "TGACTTTGCTATGCAG"),
-  ATEST("exact_8x16", "ACCAGATC", "ACCAACACTGGATTGC"),
+static const SeqPair tests8x16[] = {
+  SEQ_PAIR("basic_8x16", "TGATTTAG", "TGACTTTGCTATGCAG"),
+  SEQ_PAIR("exact_8x16", "ACCAGATC", "ACCAACACTGGATTGC"),
 };
 
 // --- 16x16 tests ---
-static const AlignmentTest tests16x16[] = {
-  ATEST("basic_16x16", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAG"),
-  ATEST("exact_16x16", "ACCAACACTGGATTGC", "ACCAACACTGGATTGC"),
-  ATEST("oppst_16x16", "AAAATTTTAAAATTTT", "CCCCGGGGCCCCGGGG"),
-  ATEST("ATCG_16x16" , "AAAATTTTCCCCGGGG", "GGAAAATTTTCCCCGG"),
+static const SeqPair tests16x16[] = {
+  SEQ_PAIR("basic_16x16", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAG"),
+  SEQ_PAIR("exact_16x16", "ACCAACACTGGATTGC", "ACCAACACTGGATTGC"),
+  SEQ_PAIR("oppst_16x16", "AAAATTTTAAAATTTT", "CCCCGGGGCCCCGGGG"),
+  SEQ_PAIR("ATCG_16x16" , "AAAATTTTCCCCGGGG", "GGAAAATTTTCCCCGG"),
 };
 
 // --- 16x17 tests ---
-static const AlignmentTest tests16x17[] = {
-  ATEST("basic_16x17", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAGT"),
+static const SeqPair tests16x17[] = {
+  SEQ_PAIR("basic_16x17", "TGAAATTTTGTTGCAG", "TGACTTTGCTATGCAGT"),
 };
 
 
 // --- 32x32 tests ---
-static const AlignmentTest tests32x32[] = {
-  ATEST("ATCG_32x32"       , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
-  ATEST("ATCG2_32x32"      , "TGAAAGCCAGTTGGTGTTAAGGGGTGCTCTGT", "CCAGGACGCCACGCGTAGTGAGACTTACATGT"),
-  ATEST("AT_content0_32x32", "ATTAAAAATATATTTAAATTTTAAATTTTATT", "ATTAAAAAATATATATTTTATTTTTATAATTT"),
+static const SeqPair tests32x32[] = {
+  SEQ_PAIR("ATCG_32x32"       , "TTTTCACTTAAAGTATTATGCACGACAGGGTG", "CGTGTACCATGTAAACCTGTTATAACTTACCT"),
+  SEQ_PAIR("ATCG2_32x32"      , "TGAAAGCCAGTTGGTGTTAAGGGGTGCTCTGT", "CCAGGACGCCACGCGTAGTGAGACTTACATGT"),
+  SEQ_PAIR("AT_content0_32x32", "ATTAAAAATATATTTAAATTTTAAATTTTATT", "ATTAAAAAATATATATTTTATTTTTATAATTT"),
 };
 
 // --- 32x64 tests ---
-static const AlignmentTest tests32x64[] = {
-  ATEST("ATCG_32x64",
+static const SeqPair tests32x64[] = {
+  SEQ_PAIR("ATCG_32x64",
         "TTTTCACTTAAAGTATTATGCACGACAGGGTG",
         "CGTGTACCATGTAAACCTGTTATAACTTACCTCGTGTACCATGTAAACCTGTTATAACTTACCT"),
 };
 
 // --- 31x33 tests ---
-static const AlignmentTest tests31x33[] = {
-  ATEST("basic_31x33", "GTAGGGTTGGACCGCACGCATGTTAAACTGC", "TGGCGAACCGCGATTCCACGACCGGTGCACGAT"),
+static const SeqPair tests31x33[] = {
+  SEQ_PAIR("basic_31x33", "GTAGGGTTGGACCGCACGCATGTTAAACTGC", "TGGCGAACCGCGATTCCACGACCGGTGCACGAT"),
 };
 
 
 // --- 80x80 tests ---
-static const AlignmentTest tests80x80[] = {
-  ATEST("ATCG1_80x80",
+static const SeqPair tests80x80[] = {
+  SEQ_PAIR("ATCG1_80x80",
         "GACACGCGTCTCCTTGCGGGTAAATCGCCGACCGCAGAACTTACGAGCCAGGGGAAACAGTAAGGCCTAATTAGGTAAAG",
         "ACGAGATTTGAGGTAAACCAAATGAGCACATAGTGGCGCTATCCGACTATTTCCAAATTGTAACATATCGTTCCATGAAG"),
-  ATEST("ATCG2_80x80",
+  SEQ_PAIR("ATCG2_80x80",
         "TTCATACCGCTCATTCACTAGGTTGCGAAGTCTACACTGATATATGAATCCGAGCTAGAGCAGGGCTCTTAAAATTCGGA",
         "AAGGCTCAGAGTGCAGACTGGAGCGCCCATCTAACGGTTCGCATCTCGAATGCTCGGTCGCCTTTCACATTCCGCGAAAA"),
 };
 
 // --- 88x88 tests ---
-static const AlignmentTest tests88x88[] = {
-  ATEST("ATCG1_88x88",
+static const SeqPair tests88x88[] = {
+  SEQ_PAIR("ATCG1_88x88",
         "GACACGCGTCTCCTTGCGGGTAAATCGCCGACCGCAGAACTTACGAGCCAGGGGAAACAGTAAGGCCTAATTAGGTAAAGAATTCCTA",
         "ACGAGATTTGAGGTAAACCAAATGAGCACATAGTGGCGCTATCCGACTATTTCCAAATTGTAACATATCGTTCCATGAAGGATCTAGC"),
-  ATEST("ATCG2_88x88",
+  SEQ_PAIR("ATCG2_88x88",
         "TTCATACCGCTCATTCACTAGGTTGCGAAGTCTACACTGATATATGAATCCGAGCTAGAGCAGGGCTCTTAAAATTCGGACGATCCTC",
         "AAGGCTCAGAGTGCAGACTGGAGCGCCCATCTAACGGTTCGCATCTCGAATGCTCGGTCGCCTTTCACATTCCGCGAAAACGAGCATC"),
 };
 
 // --- 60x132 tests ---
-static const AlignmentTest tests60x132[] = {
-  ATEST("ATCG1_60x132",
+static const SeqPair tests60x132[] = {
+  SEQ_PAIR("ATCG1_60x132",
         "GTGTACAAGTAATTGTCAACAGACCATCGTGTTTTCATAATGGTACCAGGATCTTCAAGC",
         "ACTTGTACCCAACCCCCGAAGTTTAGCAGGTCGTGGGGTGTCATGGAGCCTCTGGTTCATCCCGTGGGATATCAAGCTTCGTCTTGATAAAGCTCCCCGCTCGGGTGTAGCAGAGAAGACGCCTACTGAATT"),
-  ATEST("ATCG2_60x132",
+  SEQ_PAIR("ATCG2_60x132",
         "CGTGTCAATCAAGCTCGGATTACGGTGTTTACTCCGTCCTGCGGTTACTCACGGTCTGTA",
         "ATCCACCTCAAGTCAAGCCATTGCCTCTCTGAGACGCCGCATGAATTAATACGTATACTTTGCGCGGGTTCACTGCGATCCGTTCAGAGTCGTCCAAGGGCACAATCGAGCTCCCATTTGTATGTTCGGCTA"),
 };
 
 // --- 244x32 tests ---
-static const AlignmentTest tests244x32[] = {
-  ATEST("ATCG1_244x32",
+static const SeqPair tests244x32[] = {
+  SEQ_PAIR("ATCG1_244x32",
         "CTCCCACTTAGATTGCCACGCATAGAGCTAGCGAGTCAGCGAAAAGCATGACGCGCTTTCAAGCGTGGCGAGTATGTGAACCAAGGCTTCGGACAGGACTATATACTTAGGTTTGATCTCGCCCCGAGAACTGTAAACCTCAACATTTATAGATTATAAGGTTAGCCGAAAATGCACGTGGTGGCGCCCGCCGACTGCTCCCTGAGTGTGGCTCTTTGTTCTGTCAACGCCCGACCTTCATCGC",
         "CCAATATTTAGTTTCTAAGCCTTGCGACAGAC"),
-  ATEST("ATCG2_244x32",
+  SEQ_PAIR("ATCG2_244x32",
         "GGCCGATTCCTTCTGCGGACCATGTCGTCCTGATACTTTGGCCATGTTTCCGTTGTAGGAGTGAAGCCACTTGGCTTTGCGCCGTAGTTCCAATGAAAAACCTATGGACTTTGTTTAGGGTAGCATCAGGAATCTGAACCCTCAGAAAGTGGGGATCCCGGGTATAGACCTTTATCTGCGGTTCAAGTTAGGCATAAGGCTGCATGCTACCTTGTCACACCTACACTGCTCGAAGTAAATATGG",
         "GTGCGATCCCTGCACCTCAGCTAAGGTAGCTA"),
 };
 
-// Flat list of all tests across all sizes — add new arrays here
-static const AlignmentTest *all_test_groups[] = {
-  tests7x7,
-  tests8x16,
-  tests16x16,
-  tests16x17,
-  tests32x32,
-  tests32x64,
-  tests31x33,
-  tests80x80,
-  tests88x88,
-  tests60x132,
-  tests244x32,
-};
-static const size_t all_test_group_sizes[] = {
-  sizeof(tests7x7) / sizeof(tests7x7[0]),
-  sizeof(tests8x16) / sizeof(tests8x16[0]),
-  sizeof(tests16x16) / sizeof(tests16x16[0]),
-  sizeof(tests16x17) / sizeof(tests16x17[0]),
-  sizeof(tests32x32) / sizeof(tests32x32[0]),
-  sizeof(tests32x64) / sizeof(tests32x64[0]),
-  sizeof(tests31x33) / sizeof(tests31x33[0]),
-  sizeof(tests80x80) / sizeof(tests80x80[0]),
-  sizeof(tests88x88) / sizeof(tests88x88[0]),
-  sizeof(tests60x132) / sizeof(tests60x132[0]),
-  sizeof(tests244x32) / sizeof(tests244x32[0]),
-};
+// To add a new test group: add one line here — nothing else needed.
+#define ALL_TEST_GROUPS(TEST) \
+  TEST(tests7x7)    \
+  TEST(tests8x16)   \
+  TEST(tests16x16)  \
+  TEST(tests16x17)  \
+  TEST(tests32x32)  \
+  TEST(tests32x64)  \
+  TEST(tests31x33)  \
+  TEST(tests80x80)  \
+  TEST(tests88x88)  \
+  TEST(tests60x132) \
+  TEST(tests244x32)
+
+#define _TGROUP_PTR(arr)  arr,
+#define _TGROUP_SIZE(arr) sizeof(arr) / sizeof(arr[0]),
+
+// Generates array of our tests. Cleaner, less repetitive.
+static const SeqPair *all_test_groups[]  = { ALL_TEST_GROUPS(_TGROUP_PTR)  };
+static const size_t         all_test_group_sizes[] = { ALL_TEST_GROUPS(_TGROUP_SIZE) };
