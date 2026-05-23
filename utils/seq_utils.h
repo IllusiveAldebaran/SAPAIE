@@ -13,29 +13,17 @@
 #define INS_PENALTY     2
 #define DEL_PENALTY     2
 
+struct SeqPair {
+  std::string name;
+  std::string ref; // note ref and query are parsed as uint8_t almost immediately
+  std::string query;
+  // these lengths can be retrieved from calculating ref and query lengths, but are just stored for simplicity sake
+  uint32_t ref_len;
+  uint32_t query_len;
+};
+
 constexpr uint16_t sat_sub_u16(uint16_t a, uint16_t b) {
     return (a > b) ? (a - b) : uint16_t(0);
-}
-
-inline std::string getCleanedSequence(const std::string& fileName) {
-  std::string finalSequence;
-  std::ifstream file(fileName);
-  if (!file.is_open()) {
-    std::cerr << "Could not open file: " << fileName << std::endl;
-    return finalSequence;
-  }
-  std::string line;
-  bool headerSkipped = false;
-  while (std::getline(file, line)) {
-    if (line.empty() || line[0] == ';') continue;
-    if (!headerSkipped) { headerSkipped = true; continue; }
-    for (char c : line) {
-      if (std::isspace(c) || c == '1') continue;
-      finalSequence += c;
-    }
-  }
-  file.close();
-  return finalSequence;
 }
 
 /* Smith Waterman Score

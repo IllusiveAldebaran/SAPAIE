@@ -4,16 +4,10 @@
 #pragma once
 #include <cstdint>
 
-struct SeqPair {
-  const char *name;
-  const char *ref; // note ref and query are parsed as uint8_t almost immediately
-  const char *query;
-  uint32_t ref_len;
-  uint32_t query_len;
-};
+#include "../utils/seq_utils.h" // for the SeqPair struct
 
 #define SEQ_PAIR(name, ref, query) \
-  { name, ref, query, (uint32_t)__builtin_strlen(ref), (uint32_t)__builtin_strlen(query) }
+  { std::string(name), std::string(ref), std::string(query), (uint32_t)__builtin_strlen(ref), (uint32_t)__builtin_strlen(query) }
 
 // Returns "build/<ref_len>x<query_len>" — static buffer, not thread-safe.
 // Used to find place where the mlir kenrel for specific sizes are

@@ -40,12 +40,12 @@ static std::string g_base_dir; // directory of the executable, for resolving bui
 
 void initialize_ref(DATATYPE_IN *seq, int seqLen) {
   for (int i = 0; i < seqLen; i++)
-    seq[i] = (uint8_t)g_test->ref[i];
+    seq[i] = (uint8_t)(unsigned char)g_test->ref[i];
 }
 
 void initialize_qry(DATATYPE_IN *seq, int seqLen) {
   for (int i = 0; i < seqLen; i++)
-    seq[i] = (uint8_t)g_test->query[i];
+    seq[i] = (uint8_t)(unsigned char)g_test->query[i];
 }
 
 // Zero output buffer

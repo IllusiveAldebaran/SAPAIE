@@ -40,7 +40,7 @@ static std::string g_base_dir; // directory of the executable, for resolving bui
 
 void initialize_ref(DATATYPE_IN *seq, int seqLen) {
   for (size_t i = 0; i < seqLen; i++)
-    seq[i] = (uint8_t)g_test->ref[i];
+    seq[i] = (uint8_t)(unsigned char)g_test->ref[i];
   // pad out sequence so it is 4 byte aligned (mlir requirement)
   for (size_t i = seqLen; i < seqLen + (4 - seqLen % 4) % 4; i++)
     seq[i] = (uint8_t)'P';
@@ -48,7 +48,7 @@ void initialize_ref(DATATYPE_IN *seq, int seqLen) {
 
 void initialize_qry(DATATYPE_IN *seq, int seqLen) {
   for (size_t i = 0; i < seqLen; i++)
-    seq[i] = (uint8_t)g_test->query[i];
+    seq[i] = (uint8_t)(unsigned char)g_test->query[i];
   // pad out sequence so it is 4 byte aligned (mlir requirement)
   for (size_t i = seqLen; i < seqLen + (4 - seqLen % 4) % 4; i++)
     seq[i] = (uint8_t)'P';
