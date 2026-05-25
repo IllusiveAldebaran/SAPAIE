@@ -1,7 +1,9 @@
 TARGET := align_cpu
 SRC := align_cpu.cpp
-HEADER := 
-FILELIST = inputs/seq16_1.seq inputs/seq16_2.seq
+HEADER :=
+INCLUDES := -I./kseqpp-1.1.2-noarch/include
+LIBS     := -lz
+FILELIST = inputs/synthetic-single.fa
 
 # Base Compiler Flags 
 CXX := g++
@@ -17,7 +19,7 @@ CXXFLAGS += -DGRID_SIZE=$(GRID_SIZE)
 all: $(TARGET)
 
 $(TARGET): $(SRC) $(HEADER)
-	$(CXX) $(CXXFLAGS) $(SRC) -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SRC) -o $@ $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f $(TARGET)

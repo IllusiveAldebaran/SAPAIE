@@ -13,29 +13,25 @@
 #define INS_PENALTY     2
 #define DEL_PENALTY     2
 
+struct SeqPair {
+  std::string name;
+  // note ref and query are parsed as uint8_t almost immediately for any operations
+  std::string ref;
+  std::string query;
+  // these lengths can be retrieved from calculating ref and query lengths, but are just stored for simplicity sake
+  uint32_t ref_len;
+  uint32_t query_len;
+
+  std::string toString() const {
+    return "Alignment Pair -> Name: " + name + " "
+          + "Ref: " + ref  + " "
+          + "Qry: " + query + " "
+          + "Sizes:" + std::to_string(query_len) + "x" + std::to_string(ref_len) + "\n";
+  }
+};
+
 constexpr uint16_t sat_sub_u16(uint16_t a, uint16_t b) {
     return (a > b) ? (a - b) : uint16_t(0);
-}
-
-inline std::string getCleanedSequence(const std::string& fileName) {
-  std::string finalSequence;
-  std::ifstream file(fileName);
-  if (!file.is_open()) {
-    std::cerr << "Could not open file: " << fileName << std::endl;
-    return finalSequence;
-  }
-  std::string line;
-  bool headerSkipped = false;
-  while (std::getline(file, line)) {
-    if (line.empty() || line[0] == ';') continue;
-    if (!headerSkipped) { headerSkipped = true; continue; }
-    for (char c : line) {
-      if (std::isspace(c) || c == '1') continue;
-      finalSequence += c;
-    }
-  }
-  file.close();
-  return finalSequence;
 }
 
 /* Smith Waterman Score
@@ -99,6 +95,25 @@ inline void fillDPtoDPD(uint16_t* DP, uint16_t* DPD,
       DPD[(j+i)*DP_COLS + i] = DP[j*DP_COLS + i];
 }
 
+/* Copies DPD elements to DPDB (diagonal batched)
+ * Pretty much 1 to 1 memory location + offset
+ */
+inline void fillDPDtoDPDB(uint16_t* DPD, uint16_t* DPDB,
+                                const uint32_t DP_COLS, const uint32_t DP_ROWS, uint32_t seqIdx) {
+
+  size_t i, j;
+  // copy the diagonals. There are DP_COLS diagonals of DP_COLS for every unbatched align
+  // aka this traversal is just copying row by row in original DP
+  for (size_t d = 0; d < DP_ROWS; d++) {
+    for (i = 0; i < DP_COLS; i++) {
+      // check that we are not going beyond the diagonal
+      j = (d+i+seqIdx);
+      DPDB[j*DP_COLS + i] = DPD[(d+i)*DP_COLS + i];
+    }
+  }
+}
+
+
 // prints the alignment DP matrix and sequences
 // If diagonally aligned then prints out differently
 void showDP(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, uint16_t* DP, bool diagAligned=false) {
@@ -144,6 +159,40 @@ void showDP(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, 
     }
 
   }
-  
+}
 
+/* prints the alignment DP matrix and sequences
+ * If diagonally aligned then prints out differently
+ * Since alignments are batched all reference sequence and query sequences are packed together
+ * Padding is counted as part of the sequence and there is a new variable for the true length of the DP column
+ */
+void showDPDB(uint8_t* refSeq, uint32_t refLen, uint8_t* qrySeq, uint32_t qryLen, uint32_t bDPRows, uint32_t bDPCols, uint16_t* DP) {
+  const size_t DP_COLS = bDPCols;
+  const size_t DP_ROWS = qryLen; // this one includes all batched queries here
+
+  printf("Showing multiple DP scores (%dx%d) folded into (%dx%d):\n", bDPRows, refLen, qryLen, bDPCols);
+  
+  printf("%c\n", qrySeq[0]); // initial pad 0
+  printf("%c  +", (char)qrySeq[1]);
+  for(int i = 0; i < bDPCols; i++) printf("————");
+  printf("\n");
+  
+  for(int j = 0; j < DP_ROWS + DP_COLS - 1; j++) {
+    if(j < DP_ROWS-2)
+      printf("%c  |", qrySeq[j+2]);
+    else
+      printf("   |");
+
+    for(int i = 0; i<DP_COLS; i++) {
+      // if padding diagonal then do this, but do not do the last 
+      //   or first padding (upper and lower triangular I guess?)
+      //   as they are not defined
+      if( (j-i) % bDPRows == 0 && (j-i) >= 0 && (j-i) < DP_ROWS) {
+        printf("   %c", refSeq[((j-i)/bDPRows)*bDPCols + i]); // (j-i)/bDPRows can tell us which diagonal we are on. beware initial padding.
+      } else {
+        printf(" %3d", DP[j * DP_COLS + i]);
+      }
+    }
+    printf("\n");
+  }
 }
